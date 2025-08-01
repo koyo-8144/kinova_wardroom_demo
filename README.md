@@ -1,4 +1,4 @@
-# EVF-SAM Kinonva Demo
+# EVF-SAM Kinova Demo
 
 ![](imgs/evfsam_kinova.jpeg)
 
