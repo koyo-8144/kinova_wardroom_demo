@@ -19,6 +19,7 @@ from sensor_msgs.msg import  JointState
 import paho.mqtt.client as mqtt
 import tf
 import tf.transformations as tf_trans
+from std_msgs.msg import Bool
 
 # Define the broker address and port
 BROKER_ADDRESS = "172.22.247.109"
@@ -28,10 +29,9 @@ BROKER_PORT = 15672
 # url = "http://100.106.58.3:8000/predict"  # Note the '/predict' endpoint
 url = "http://172.22.247.237:8000/predict"
 
-DEBUG_OBJ = 1
 
 
-class EVFsamClientGraspPlanning():
+class EVFsamClientBroadcastObject():
     def __init__(self):
         self.listener = tf.TransformListener()
         self.broadcaster = tf.TransformBroadcaster()
@@ -45,6 +45,10 @@ class EVFsamClientGraspPlanning():
         # self.client = mqtt.Client()
         # self.client.on_connect = self.on_connect
         # self.client.on_message = self.on_message
+
+
+        self.tf_done_pub = rospy.Publisher("/object_found", Bool, queue_size=1, latch=True)
+
  
     def init_params(self):
 
@@ -59,7 +63,7 @@ class EVFsamClientGraspPlanning():
         # self.load_in_4bit = False
         # self.model_type = "ori" # "ori", "effi", "sam2"
         # self.image_path = "assets/zebra.jpg"
-        self.prompt = "pick an apple"
+        self.prompt = "banana"
         # self.prompt = "pick up a blue cup"
 
         self.img_w = 1280
@@ -68,7 +72,7 @@ class EVFsamClientGraspPlanning():
         self.img_save_dir = "image_files"
  
         self.display_count = 0
-        self.display_itr = 2
+        self.display_itr = 10
  
         self.data_path = '/home/sandisk/koyo_ws/demo_ws/src/demo_pkg/evfsam_graspnet_demo/data'
  
@@ -152,7 +156,7 @@ class EVFsamClientGraspPlanning():
     def start_demo(self):
         print("----------------------------------------------------")
         print("DEMO START")
-        self.receive_message()
+        # self.receive_message()
 
         self.start_evfsam()
         self.process_img(self.data_path)
@@ -406,12 +410,11 @@ class EVFsamClientGraspPlanning():
         print("Transformation Matrix (camera color to object):\n", T_camera_color_obj)
         print("Transformation Matrix (base to object):\n", T_base_obj)
 
-        if DEBUG_OBJ:
-            print("Debug Object")
-            self.publish_tf(T_base_obj, "/base_link", "/object")
 
-        self.target_pos = self.transformation_to_pose(T_base_obj)
-        print("Target Pose:\n", self.target_pos)
+        self.publish_tf(T_base_obj, "/base_link", "/object")
+
+        # self.target_pos = self.transformation_to_pose(T_base_obj)
+        # print("Target Pose:\n", self.target_pos)
 
 
     def pixel_to_camera_coords(self, x, y, depth, intrinsic, factor_depth):
@@ -509,7 +512,12 @@ class EVFsamClientGraspPlanning():
                 parent_frame      # Parent frame
             )
 
+            # Publish completion signal
+            self.tf_done_pub.publish(True)
+            rospy.loginfo("Object found and completion signal sent.")
+
             self.rate.sleep()
+
 
 
     ####### grasp planning #######
@@ -624,7 +632,8 @@ class EVFsamClientGraspPlanning():
  
  
 def main():
-    evfsam_graspnet = EVFsamClientGraspPlanning()
+    rospy.init_node('evfsam_client_node', anonymous=True)
+    evfsam_graspnet = EVFsamClientBroadcastObject()
     evfsam_graspnet.start_demo()
  
 if __name__ == "__main__":
