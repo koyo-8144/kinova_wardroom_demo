@@ -153,9 +153,9 @@ class GraspPlannerNode():
         rospy.loginfo("Starting grasp planning...")
         rospy.loginfo("Moving to start position")
         self.go_sp()
-        self.receive_message()
-        time.sleep(5)  # Add a 5-second delay
-        print("waited for 5 seconds")
+        # self.receive_message()
+        # time.sleep(5)  # Add a 5-second delay
+        # print("waited for 5 seconds")
         self.execute_grasp_sequence()
         self.send_message()
 
@@ -168,11 +168,12 @@ class GraspPlannerNode():
 
         rospy.loginfo('Starting grasp sequence')
 
-        # self.object = "banana"
+        self.object = "banana"
 
         if self.object == "banana":
             # 1. Grasp the object
             self.grasp_banana()
+            breakpoint()
 
             # 3. Move gripper based on the grasp width
             width = 0.05

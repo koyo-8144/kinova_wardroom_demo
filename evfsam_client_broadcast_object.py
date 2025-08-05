@@ -72,7 +72,7 @@ class EVFsamClientBroadcastObject():
         self.img_save_dir = "image_files"
  
         self.display_count = 0
-        self.display_itr = 10
+        self.display_itr = 15
  
         self.data_path = '/home/sandisk/koyo_ws/demo_ws/src/demo_pkg/evfsam_graspnet_demo/data'
  
@@ -310,10 +310,14 @@ class EVFsamClientBroadcastObject():
                     ymin = response_json["ymin"]
                     xmax = response_json["xmax"]
                     ymax = response_json["ymax"]
+                    center_x = response_json["center_x"]
+                    center_y = response_json["center_y"]
                     print("xmin: ", xmin)
                     print("ymin: ", ymin)
                     print("xmax: ", xmax)
                     print("ymax: ", ymax)
+                    print("center_x: ", center_x)
+                    print("center_y: ", center_y)
 
                 else:
                     print(f"Error: {response.status_code}")
@@ -356,6 +360,7 @@ class EVFsamClientBroadcastObject():
             self.color_image = color_image
             self.depth_image = depth_image
             self.xmin, self.ymin, self.xmax, self.ymax = xmin, ymin, xmax, ymax
+            self.center_x, self.center_y = center_x, center_y
             self.intrinsics = intrinsics
 
             cv2.destroyAllWindows()
@@ -375,27 +380,31 @@ class EVFsamClientBroadcastObject():
         intrinsic[1][2] = self.intrinsics.ppy
         factor_depth = 1000  # Set depth scaling factor for the camera
 
-        # Extract 2D bounding box coordinates
-        xmin, ymin, xmax, ymax = self.xmin, self.ymin, self.xmax, self.ymax
+        # # Extract 2D bounding box coordinates
+        # xmin, ymin, xmax, ymax = self.xmin, self.ymin, self.xmax, self.ymax
 
-        print("Top-left in camera: ", (xmin, ymin))
-        print("Top-right in camera: ", (xmax, ymin))
-        print("Bottom-left in camera: ", (xmin, ymax))
-        print("Bottom-right in camera: ", (xmax, ymax))
+        # print("Top-left in camera: ", (xmin, ymin))
+        # print("Top-right in camera: ", (xmax, ymin))
+        # print("Bottom-left in camera: ", (xmin, ymax))
+        # print("Bottom-right in camera: ", (xmax, ymax))
 
-        # Convert all 4 corners to 3D coordinates
-        top_left_3d = self.pixel_to_camera_coords(xmin, ymin, depth, intrinsic, factor_depth)  # Top-left
-        top_right_3d = self.pixel_to_camera_coords(xmax, ymin, depth, intrinsic, factor_depth)  # Top-right
-        bottom_left_3d = self.pixel_to_camera_coords(xmin, ymax, depth, intrinsic, factor_depth)  # Bottom-left
-        bottom_right_3d = self.pixel_to_camera_coords(xmax, ymax, depth, intrinsic, factor_depth)  # Bottom-right
+        # # Convert all 4 corners to 3D coordinates
+        # top_left_3d = self.pixel_to_camera_coords(xmin, ymin, depth, intrinsic, factor_depth)  # Top-left
+        # top_right_3d = self.pixel_to_camera_coords(xmax, ymin, depth, intrinsic, factor_depth)  # Top-right
+        # bottom_left_3d = self.pixel_to_camera_coords(xmin, ymax, depth, intrinsic, factor_depth)  # Bottom-left
+        # bottom_right_3d = self.pixel_to_camera_coords(xmax, ymax, depth, intrinsic, factor_depth)  # Bottom-right
 
-        print("Top-left in 3d: ", top_left_3d)
-        print("Top-right in 3d: ", top_right_3d)
-        print("Bottom-left in 3d: ", bottom_left_3d)
-        print("Bottom-right in 3d: ", bottom_right_3d)
+        # print("Top-left in 3d: ", top_left_3d)
+        # print("Top-right in 3d: ", top_right_3d)
+        # print("Bottom-left in 3d: ", bottom_left_3d)
+        # print("Bottom-right in 3d: ", bottom_right_3d)
     
-        corners_3d = np.array([top_left_3d, top_right_3d, bottom_left_3d, bottom_right_3d])
-        obj_center = np.mean(corners_3d, axis=0)
+        # corners_3d = np.array([top_left_3d, top_right_3d, bottom_left_3d, bottom_right_3d])
+        # obj_center = np.mean(corners_3d, axis=0)
+        # print("Object center in 3D: ", obj_center)
+
+        center_x, center_y = self.center_x, self.center_y
+        obj_center = self.pixel_to_camera_coords(center_x, center_y, depth, intrinsic, factor_depth)
         print("Object center in 3D: ", obj_center)
 
         R_obj = np.eye(3)
@@ -418,7 +427,9 @@ class EVFsamClientBroadcastObject():
 
 
     def pixel_to_camera_coords(self, x, y, depth, intrinsic, factor_depth):
-        Z = depth[y, x] / factor_depth  # Depth (distance from camera)
+        Z_pred = depth[y, x] / factor_depth  # Depth (distance from camera)
+        print("Predicted Z: ", Z_pred)
+        Z = 1
         X = (x - intrinsic[0][2]) * Z / intrinsic[0][0]  # X in camera coordinates
         Y = (y - intrinsic[1][2]) * Z / intrinsic[1][1] 
         # Y = -(y - intrinsic[1][2]) * Z / intrinsic[1][1]  # Invert Y to increase upwards
@@ -511,6 +522,8 @@ class EVFsamClientBroadcastObject():
                 child_frame,  # Child frame
                 parent_frame      # Parent frame
             )
+
+            rospy.loginfo(f"Translation: {translation}")
 
             # Publish completion signal
             self.tf_done_pub.publish(True)

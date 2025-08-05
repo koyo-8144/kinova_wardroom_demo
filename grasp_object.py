@@ -11,7 +11,7 @@ import pyrealsense2 as rs
 from std_msgs.msg import Bool
 from geometry_msgs.msg import PoseStamped, Pose
 
-SET_START = 1
+SET_START = 0
 
 
 class GraspObjectNode():
@@ -128,6 +128,8 @@ class GraspObjectNode():
         if SET_START:
             rospy.loginfo("Moving to start position")
             self.go_sp()
+            # T_base_ee = self.get_frame1_to_frame2("/base_link", "/tool_frame")
+            # print("T_base_ee: ", T_base_ee)
         else:
             rospy.loginfo("Moving to start position")
             self.go_sp()
@@ -321,9 +323,9 @@ class GraspObjectNode():
 
         # Create a Pose message
         pose = Pose()
-        pose.position.x = translation[0]
-        pose.position.y = translation[1]
-        pose.position.z = translation[2]
+        pose.position.x = translation[0]-0.03 # translation[0]
+        pose.position.y = translation[1]+0.1 # translation[1]
+        pose.position.z = -0.04731002  # translation[2]
 
         pose.orientation.x = quaternion[0]
         pose.orientation.y = quaternion[1]
