@@ -22,8 +22,9 @@ import tf.transformations as tf_trans
 from std_msgs.msg import Bool
 
 # Define the broker address and port
-BROKER_ADDRESS = "172.22.247.109"
-BROKER_PORT = 15672
+BROKER_ADDRESS = "172.22.3.12"
+# BROKER_ADDRESS = "172.22.2.12"
+BROKER_PORT = 1883
 
 # Define the server URL
 # url = "http://100.106.58.3:8000/predict"  # Note the '/predict' endpoint
@@ -42,14 +43,21 @@ class EVFsamClientBroadcastObject():
 
         self.init_moveit()
 
-        # self.client = mqtt.Client()
-        # self.client.on_connect = self.on_connect
-        # self.client.on_message = self.on_message
+        self.client = mqtt.Client()
+        self.client.on_connect = self.on_connect
+        self.client.on_message = self.on_message
 
 
         self.tf_done_pub = rospy.Publisher("/object_found", Bool, queue_size=1, latch=True)
+        self.manip_done = False
+        rospy.Subscriber("/manip_done", Bool, self.manip_done_callback)
 
  
+    def manip_done_callback(self, msg):
+        if msg.data:  # If True received
+            rospy.loginfo("Received manipulation done signal.")
+            self.manip_done = True
+
     def init_params(self):
 
         # # EVF-SAM params
@@ -63,8 +71,8 @@ class EVFsamClientBroadcastObject():
         # self.load_in_4bit = False
         # self.model_type = "ori" # "ori", "effi", "sam2"
         # self.image_path = "assets/zebra.jpg"
-        self.prompt = "banana"
-        # self.prompt = "pick up a blue cup"
+        # self.object = "banana"
+        # self.object = "pick up a blue cup"
 
         self.img_w = 1280
         self.img_h = 720
@@ -156,7 +164,7 @@ class EVFsamClientBroadcastObject():
     def start_demo(self):
         print("----------------------------------------------------")
         print("DEMO START")
-        # self.receive_message()
+        self.receive_message()
 
         self.start_evfsam()
         self.process_img(self.data_path)
@@ -270,7 +278,7 @@ class EVFsamClientBroadcastObject():
 
                 # Prepare the payload
                 files = {
-                    "text_prompt": (None, self.prompt),
+                    "text_prompt": (None, self.object),
                     "image": ("image.png", buffer.tobytes(), "image/png")
                 }
 
@@ -429,7 +437,7 @@ class EVFsamClientBroadcastObject():
     def pixel_to_camera_coords(self, x, y, depth, intrinsic, factor_depth):
         Z_pred = depth[y, x] / factor_depth  # Depth (distance from camera)
         print("Predicted Z: ", Z_pred)
-        Z = 1
+        Z = 0.6025
         X = (x - intrinsic[0][2]) * Z / intrinsic[0][0]  # X in camera coordinates
         Y = (y - intrinsic[1][2]) * Z / intrinsic[1][1] 
         # Y = -(y - intrinsic[1][2]) * Z / intrinsic[1][1]  # Invert Y to increase upwards
@@ -513,7 +521,7 @@ class EVFsamClientBroadcastObject():
         rospy.loginfo(f"Translation: {translation}")
         rospy.loginfo(f"Quaternion: {quaternion}")
 
-        while not rospy.is_shutdown():
+        while not rospy.is_shutdown() or not self.manip_done:
             # Broadcast transform
             self.broadcaster.sendTransform(
                 translation,    # Position (x, y, z)
@@ -531,6 +539,8 @@ class EVFsamClientBroadcastObject():
 
             self.rate.sleep()
 
+
+        self.send_message()
 
 
     ####### grasp planning #######
@@ -627,7 +637,7 @@ class EVFsamClientBroadcastObject():
                                                -2.114137663337607, -1.6563429070772748])
         self.arm_group.go(wait=True)
 
-        self.gripper_move(0.6)
+        self.gripper_move(0.7)
 
     def gripper_move(self, width):
         joint_state_msg = rospy.wait_for_message("/my_gen3_lite/joint_states", JointState, timeout=1.0)

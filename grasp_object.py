@@ -11,7 +11,13 @@ import pyrealsense2 as rs
 from std_msgs.msg import Bool
 from geometry_msgs.msg import PoseStamped, Pose
 
+import time
+
 SET_START = 0
+
+BROKER_ADDRESS = "172.22.3.12"
+# BROKER_ADDRESS = "172.22.2.12"
+BROKER_PORT = 1883
 
 
 class GraspObjectNode():
@@ -24,6 +30,9 @@ class GraspObjectNode():
         rospy.Subscriber("/object_found", Bool, self.object_found_callback)
 
         self.init_moveit()
+
+        self.manip_done_pub = rospy.Publisher("/manip_done", Bool, queue_size=1, latch=True)
+
     
 
     def init_moveit(self):
@@ -123,6 +132,8 @@ class GraspObjectNode():
                     print("Target Pose:\n", self.target_pos)
                     self.execute_grasp_sequence()
                 self._rate.sleep()
+
+            # self.send_message()
     
     def start(self):
         if SET_START:
@@ -150,6 +161,9 @@ class GraspObjectNode():
                     # Set done flags
                     self.ready_to_grasp = False
                     self.grasp_done = True
+
+                    self.manip_done_pub(True)
+                    rospy.loginfo("Manipulation done, completion signal sent.")
 
                 self._rate.sleep()
 
@@ -251,7 +265,7 @@ class GraspObjectNode():
         self.arm_group.go()
 
 
-        self.gripper_move(0.6)
+        self.gripper_move(0.7)
 
     def go_sp(self):
         self.arm_group.set_joint_value_target([-0.08498747219394814, -0.2794001977631106,
@@ -259,7 +273,7 @@ class GraspObjectNode():
                                                -2.114137663337607, -1.6563429070772748])
         self.arm_group.go(wait=True)
 
-        self.gripper_move(0.6)
+        self.gripper_move(0.7)
 
     def gripper_move(self, width):
         joint_state_msg = rospy.wait_for_message("/my_gen3_lite/joint_states", JointState, timeout=1.0)
@@ -324,8 +338,8 @@ class GraspObjectNode():
         # Create a Pose message
         pose = Pose()
         pose.position.x = translation[0]-0.03 # translation[0]
-        pose.position.y = translation[1]+0.1 # translation[1]
-        pose.position.z = -0.04731002  # translation[2]
+        pose.position.y = translation[1]+0.065 # translation[1]
+        pose.position.z = -0.04931002 # -0.04731002  # translation[2]
 
         pose.orientation.x = quaternion[0]
         pose.orientation.y = quaternion[1]
@@ -363,6 +377,56 @@ class GraspObjectNode():
 
             self.rate.sleep()
 
+
+
+        ####### MQTT #######
+
+    def on_connect(self, client, userdata, flags, rc):
+        if rc == 0:
+            print("Connected to Mosquitto broker!")
+            self.client.subscribe("robot/arrival")
+            print("Waiting for message .....")
+        else:
+            print(f"Failed to connect, return code {rc}")
+
+    def on_message(self, client, userdata, msg):
+        print(f"Message received: {msg.payload.decode()}")
+        self.object = msg.payload.decode()
+        print("Received object name: ", self.object)
+        client.loop_stop()
+ 
+    def receive_message(self):
+        print(f"Connecting to broker {BROKER_ADDRESS}:{BROKER_PORT}...")
+        self.client.connect(BROKER_ADDRESS, BROKER_PORT, 60)
+
+        # Start loop in a background thread
+        self.client.loop_start()
+        print("Listening for messages...")
+
+        # Wait for a message to be received
+        while self.object is None:
+            time.sleep(0.1)
+
+        print("Message received. Exiting receive_message.")
+
+    def send_message(self):
+        print(f"Connecting to broker {BROKER_ADDRESS}:{BROKER_PORT}...")
+        self.client.connect(BROKER_ADDRESS, BROKER_PORT, 60)
+
+        # Start loop in a background thread
+        self.client.loop_start()
+
+        # Publish a message
+        print("Publishing message...")
+        self.client.publish("robot/arrival", "Grasp done")
+
+        # Wait for the message to be sent
+        time.sleep(1)
+
+        # Stop the loop and disconnect
+        self.client.loop_stop()
+        self.client.disconnect()
+        print("Message sent and client disconnected.")
 
 
 

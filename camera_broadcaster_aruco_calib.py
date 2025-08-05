@@ -9,7 +9,7 @@ from sensor_msgs.msg import  JointState
 import cv2
 import pyrealsense2 as rs
 
-CALIBRATION = 0
+CALIBRATION = 1
 SET_START = 0
 ARUCO_VIS = 0
 
@@ -523,6 +523,7 @@ class CameraTFBroadcaster:
             cv2.destroyAllWindows()
         
         return T_aruco_camera
+
 
     def get_base_to_ee(self):
         while not rospy.is_shutdown():
