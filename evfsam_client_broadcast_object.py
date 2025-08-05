@@ -21,6 +21,7 @@ import tf
 import tf.transformations as tf_trans
 from std_msgs.msg import Bool
 
+MQTT = 0
 # Define the broker address and port
 BROKER_ADDRESS = "172.22.3.12"
 # BROKER_ADDRESS = "172.22.2.12"
@@ -43,20 +44,19 @@ class EVFsamClientBroadcastObject():
 
         self.init_moveit()
 
-        self.client = mqtt.Client()
-        self.client.on_connect = self.on_connect
-        self.client.on_message = self.on_message
+        if MQTT:
+            self.client = mqtt.Client()
+            self.client.on_connect = self.on_connect
+            self.client.on_message = self.on_message
+            self.object = None
+        else:
+            self.object = "banana"
 
 
         self.tf_done_pub = rospy.Publisher("/object_found", Bool, queue_size=1, latch=True)
         self.manip_done = False
         rospy.Subscriber("/manip_done", Bool, self.manip_done_callback)
 
- 
-    def manip_done_callback(self, msg):
-        if msg.data:  # If True received
-            rospy.loginfo("Received manipulation done signal.")
-            self.manip_done = True
 
     def init_params(self):
 
@@ -80,7 +80,7 @@ class EVFsamClientBroadcastObject():
         self.img_save_dir = "image_files"
  
         self.display_count = 0
-        self.display_itr = 15
+        self.display_itr = 5
  
         self.data_path = '/home/sandisk/koyo_ws/demo_ws/src/demo_pkg/evfsam_graspnet_demo/data'
  
@@ -137,10 +137,6 @@ class EVFsamClientBroadcastObject():
         self.target_pose = PoseStamped()
         self.target_pose_update = True
 
-        # Create an MQTT client instance
-        self.client = mqtt.Client()
-        
-        self.object = None
 
         # We can get the name of the reference frame for this robot:
         planning_frame = self.arm_group.get_planning_frame()
@@ -161,16 +157,22 @@ class EVFsamClientBroadcastObject():
         print("")
 
 
+    def manip_done_callback(self, msg):
+        if msg.data:  # If True received
+            rospy.loginfo("Received manipulation done signal.")
+            self.manip_done = True
+
+
     def start_demo(self):
         print("----------------------------------------------------")
         print("DEMO START")
-        self.receive_message()
+        if MQTT:
+            self.receive_message()
 
         self.start_evfsam()
         self.process_img(self.data_path)
         self.start_grasp_planning()
 
-        self.send_message()
     
     ####### MQTT #######
 
@@ -521,7 +523,7 @@ class EVFsamClientBroadcastObject():
         rospy.loginfo(f"Translation: {translation}")
         rospy.loginfo(f"Quaternion: {quaternion}")
 
-        while not rospy.is_shutdown() or not self.manip_done:
+        while not rospy.is_shutdown() and not self.manip_done:
             # Broadcast transform
             self.broadcaster.sendTransform(
                 translation,    # Position (x, y, z)
@@ -539,8 +541,10 @@ class EVFsamClientBroadcastObject():
 
             self.rate.sleep()
 
-
-        self.send_message()
+        print("self.manip_done: ", self.manip_done)
+        if MQTT and self.manip_done:
+            self.send_message()
+        breakpoint()
 
 
     ####### grasp planning #######

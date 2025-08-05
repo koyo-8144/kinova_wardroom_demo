@@ -88,8 +88,6 @@ class GraspObjectNode():
         self.target_pose = PoseStamped()
         self.target_pose_update = True
 
-        self.object = None
-
         # We can get the name of the reference frame for this robot:
         planning_frame = self.arm_group.get_planning_frame()
         print("============ Planning frame: %s" % planning_frame)
@@ -162,7 +160,7 @@ class GraspObjectNode():
                     self.ready_to_grasp = False
                     self.grasp_done = True
 
-                    self.manip_done_pub(True)
+                    self.manip_done_pub.publish(True)
                     rospy.loginfo("Manipulation done, completion signal sent.")
 
                 self._rate.sleep()
@@ -176,11 +174,6 @@ class GraspObjectNode():
         
         rospy.loginfo('Starting grasp sequence')
 
-        # self.object = "banana"
-        # if self.object == "banana":
-        #     # 1. Grasp the object
-        #     self.grasp_banana()
-
         self.grasp_object()
 
         width = 0.06
@@ -190,8 +183,6 @@ class GraspObjectNode():
         self.go_sp()
 
         rospy.loginfo("Grasp completed successfully.")
-
-
 
     def grasp_object(self):
         """
@@ -212,7 +203,6 @@ class GraspObjectNode():
         # self.plan_cartesian_path(self.target_pos)
         # self.arm_group.set_pose_target(self.target_pos)
         # self.arm_group.go()
-
 
     def grasp_banana(self):
 
@@ -235,7 +225,6 @@ class GraspObjectNode():
         # # It is always good to clear your targets after planning with poses.
         # # Note: there is no equivalent function for clear_joint_value_targets().
         # self.arm_group.clear_pose_targets()
-    
     
     def go_safepos(self):
         self.arm_group.set_joint_value_target([0.9311649540823903, -0.8526062292989058, 1.1426484404583457, -1.475054620342112, -1.1986110423408354, -0.6476030128034402])
@@ -339,7 +328,7 @@ class GraspObjectNode():
         pose = Pose()
         pose.position.x = translation[0]-0.03 # translation[0]
         pose.position.y = translation[1]+0.065 # translation[1]
-        pose.position.z = -0.04931002 # -0.04731002  # translation[2]
+        pose.position.z = -0.06 # -0.04731002  # translation[2]
 
         pose.orientation.x = quaternion[0]
         pose.orientation.y = quaternion[1]
@@ -381,53 +370,7 @@ class GraspObjectNode():
 
         ####### MQTT #######
 
-    def on_connect(self, client, userdata, flags, rc):
-        if rc == 0:
-            print("Connected to Mosquitto broker!")
-            self.client.subscribe("robot/arrival")
-            print("Waiting for message .....")
-        else:
-            print(f"Failed to connect, return code {rc}")
-
-    def on_message(self, client, userdata, msg):
-        print(f"Message received: {msg.payload.decode()}")
-        self.object = msg.payload.decode()
-        print("Received object name: ", self.object)
-        client.loop_stop()
- 
-    def receive_message(self):
-        print(f"Connecting to broker {BROKER_ADDRESS}:{BROKER_PORT}...")
-        self.client.connect(BROKER_ADDRESS, BROKER_PORT, 60)
-
-        # Start loop in a background thread
-        self.client.loop_start()
-        print("Listening for messages...")
-
-        # Wait for a message to be received
-        while self.object is None:
-            time.sleep(0.1)
-
-        print("Message received. Exiting receive_message.")
-
-    def send_message(self):
-        print(f"Connecting to broker {BROKER_ADDRESS}:{BROKER_PORT}...")
-        self.client.connect(BROKER_ADDRESS, BROKER_PORT, 60)
-
-        # Start loop in a background thread
-        self.client.loop_start()
-
-        # Publish a message
-        print("Publishing message...")
-        self.client.publish("robot/arrival", "Grasp done")
-
-        # Wait for the message to be sent
-        time.sleep(1)
-
-        # Stop the loop and disconnect
-        self.client.loop_stop()
-        self.client.disconnect()
-        print("Message sent and client disconnected.")
-
+    
 
 
 def main():
